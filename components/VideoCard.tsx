@@ -1,5 +1,4 @@
 
-
 import React from 'react';
 import { Post } from '../types';
 import Spinner from './Spinner';
@@ -19,36 +18,40 @@ const VideoCard: React.FC<VideoCardProps> = ({ post, isActive, showAiSummary = f
   const [likeCount, setLikeCount] = React.useState(post.likes);
   const [isLoadingVideo, setIsLoadingVideo] = React.useState(true); // New: for video buffering indicator
   const [loadingAiSummary, setLoadingAiSummary] = React.useState(false); // New: for AI summary generation
-  
+  const [hasUserManuallyToggledPlay, setHasUserManuallyToggledPlay] = React.useState(false); // New: to track user's explicit play/pause
+
   const videoRef = React.useRef<HTMLVideoElement>(null);
 
   React.useEffect(() => {
     if (videoRef.current) {
+      videoRef.current.muted = isMuted; // Always apply local mute state
+
       if (isActive) {
-        videoRef.current.muted = isMuted; // Use local mute state
-        setIsLoadingVideo(true); // Assume loading when activated
-        videoRef.current.play().then(() => {
-          setIsPlaying(true);
-          setShowPlayIcon(false); // Hide play icon when playing
-        }).catch(error => {
-          // Playback failed, likely due to browser autoplay policies with sound or user not interacting
-          console.error("Error attempting to play video:", error);
-          setIsPlaying(false); // Ensure isPlaying is false if play fails
-          setShowPlayIcon(true); // Show play icon to prompt user interaction
-          videoRef.current!.pause(); // Ensure it's paused
-          setIsLoadingVideo(false); // Stop loading if play fails
-        });
+        if (!hasUserManuallyToggledPlay) { // Only auto-play if user hasn't explicitly toggled
+          setIsLoadingVideo(true); // Assume loading when activated
+          videoRef.current.play().then(() => {
+            // isPlaying and showPlayIcon will be set by onPlay handler
+            setIsLoadingVideo(false);
+          }).catch(error => {
+            console.error("Error attempting to auto-play video:", error);
+            videoRef.current!.pause(); // Ensure it's paused if auto-play fails
+            setIsPlaying(false);
+            setShowPlayIcon(true);
+            setIsLoadingVideo(false); // Stop loading if play fails
+          });
+        }
       } else {
         videoRef.current.pause();
-        setIsPlaying(false);
-        setShowPlayIcon(true); // Show play icon when paused/inactive
+        // isPlaying and showPlayIcon will be set by onPause handler
+        setHasUserManuallyToggledPlay(false); // Reset for next time it becomes active
         setIsLoadingVideo(false); // Not loading if not active
       }
     }
-  }, [isActive, isMuted]);
+  }, [isActive, isMuted, hasUserManuallyToggledPlay]);
 
   // New: Effect to generate AI summary if needed for advanced feed
   React.useEffect(() => {
+    // Only attempt to generate if conditions are met
     if (showAiSummary && !post.aiSummary && !loadingAiSummary && onGenerateAiSummary && post.thumbnailUrl) {
       setLoadingAiSummary(true);
       const base64ThumbnailData = post.thumbnailUrl.split(',')[1];
@@ -64,16 +67,16 @@ const VideoCard: React.FC<VideoCardProps> = ({ post, isActive, showAiSummary = f
 
   const togglePlay = () => {
     if (videoRef.current) {
+      setHasUserManuallyToggledPlay(true); // User explicitly interacted
+
       if (isPlaying) {
         videoRef.current.pause();
-        setIsPlaying(false);
-        setShowPlayIcon(true);
+        // isPlaying and showPlayIcon will be set by onPause handler
       } else {
-        // No need to check `isActive` here, as the user explicitly clicked to play.
         setIsLoadingVideo(true); // Indicate loading when user clicks play
         videoRef.current.play().then(() => {
-          setIsPlaying(true);
-          setShowPlayIcon(false);
+          // isPlaying and showPlayIcon will be set by onPlay handler
+          setIsLoadingVideo(false);
         }).catch(error => {
           console.error("Manual play failed:", error);
           setIsPlaying(false);
@@ -132,21 +135,21 @@ const VideoCard: React.FC<VideoCardProps> = ({ post, isActive, showAiSummary = f
         onPause={() => { setIsPlaying(false); setShowPlayIcon(true); }}
         onWaiting={() => setIsLoadingVideo(true)} // Video is buffering
         onPlaying={() => setIsLoadingVideo(false)} // Video has enough data to play
-        onLoadedData={() => setIsLoadingVideo(false)} // First frame loaded
+        onLoadedData={() => setIsLoadingVideo(false)} // First frame loaded or metadata loaded
         aria-describedby={`video-caption-${post.id}`}
       >
         Your browser does not support the video tag.
       </video>
 
       {/* Video Loading Spinner */}
-      {isLoadingVideo && (
+      {isActive && isLoadingVideo && ( // Only show spinner if active and loading
         <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-70 z-20">
           <Spinner size="lg" color="text-white" />
         </div>
       )}
 
       {/* Play/Pause Overlay */}
-      {showPlayIcon && !isLoadingVideo && ( // Only show if not loading
+      {showPlayIcon && !isLoadingVideo && ( // Only show if not loading and play icon needed
         <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30 pointer-events-none">
           {isPlaying ? (
             <svg className="w-24 h-24 text-white opacity-80" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -165,8 +168,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ post, isActive, showAiSummary = f
         <div className="absolute top-4 left-4 bg-black bg-opacity-60 text-white text-xs px-3 py-1.5 rounded-lg max-w-[calc(100%-80px)] z-10 shadow-md">
           <p className="font-semibold mb-1 flex items-center">
             <svg className="w-4 h-4 mr-1 text-blue-300" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" />{/* Sparkle icon path, using home icon for now */}
-              <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" fill="currentColor" /> {/* Star/Sparkle icon path */}
+              <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" fill="currentColor" />
             </svg>
             Resumo IA: {loadingAiSummary ? <Spinner size="sm" color="text-white" className="ml-2" /> : ''}
           </p>

@@ -8,12 +8,14 @@ import Modal from './components/Modal';
 import ProfilePage from './components/ProfilePage'; // Import ProfilePage
 import { generateVideoSummary } from './services/geminiService'; // Import new service function
 
-// Declare window.aistudio globally for TypeScript using interface augmentation
-// Fix: Use the globally expected 'AIStudio' interface to prevent type conflicts.
-// This assumes 'AIStudio' is defined elsewhere in the project's global type declarations.
+// Declare window.aistudio globally for TypeScript
+// Fix: Directly define the expected methods on window.aistudio to resolve declaration conflicts.
 declare global {
   interface Window {
-    aistudio: AIStudio;
+    aistudio: {
+      hasSelectedApiKey: () => Promise<boolean>;
+      openSelectKey: () => Promise<void>;
+    };
   }
 }
 
@@ -182,8 +184,7 @@ const App: React.FC = () => {
       }
       return null;
     }
-  }, [handleApiKeySelectionNeeded]);
-
+  }, []); // Removed handleApiKeySelectionNeeded from dependency array as useCallback's purpose is to memoize the function without re-creating it due to dependency changes that are stable in itself.
 
   const updateUserProfile = (updatedProfile: Partial<UserProfile>) => {
     setUserProfile((prevProfile) => {
