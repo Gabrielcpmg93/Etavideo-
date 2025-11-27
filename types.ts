@@ -19,6 +19,14 @@ export interface Comment {
   timestamp: number;
 }
 
+export interface UserProfile {
+  id: string;
+  name: string;
+  bio: string;
+  avatarUrl: string;
+  followers: number;
+}
+
 export class GeminiApiKeyError extends Error {
   constructor(message: string) {
     super(message);

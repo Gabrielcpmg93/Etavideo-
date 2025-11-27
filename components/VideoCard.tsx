@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Post } from '../types';
 import Spinner from './Spinner';
@@ -23,9 +24,9 @@ const VideoCard: React.FC<VideoCardProps> = ({ post, isActive }) => {
           setIsPlaying(true);
           setShowPlayIcon(false); // Hide play icon when playing
         }).catch(error => {
-          // Playback failed, likely due to browser autoplay policies with sound
+          // Playback failed, likely due to browser autoplay policies with sound or user not interacting
           console.error("Error attempting to play video:", error);
-          setIsPlaying(false);
+          setIsPlaying(false); // Ensure isPlaying is false if play fails
           setShowPlayIcon(true); // Show play icon to prompt user interaction
           videoRef.current!.pause(); // Ensure it's paused
         });
@@ -41,13 +42,21 @@ const VideoCard: React.FC<VideoCardProps> = ({ post, isActive }) => {
     if (videoRef.current) {
       if (isPlaying) {
         videoRef.current.pause();
+        setIsPlaying(false);
+        setShowPlayIcon(true);
       } else {
-        // If unmuted and attempting to play, it might be blocked.
-        // The useEffect handles the actual play/pause logic based on isActive.
-        videoRef.current.play().catch(error => console.error("Error playing video:", error));
+        // Only attempt to play if not already playing and it's the active video
+        if (isActive) {
+          videoRef.current.play().then(() => {
+            setIsPlaying(true);
+            setShowPlayIcon(false);
+          }).catch(error => {
+            console.error("Manual play failed:", error);
+            setIsPlaying(false);
+            setShowPlayIcon(true);
+          });
+        }
       }
-      setIsPlaying(!isPlaying);
-      setShowPlayIcon(!isPlaying); // Show icon if becoming paused, hide if becoming playing
     }
   };
 
@@ -117,8 +126,8 @@ const VideoCard: React.FC<VideoCardProps> = ({ post, isActive }) => {
         </div>
       )}
 
-      {/* Overlaid UI Elements */}
-      <div className="absolute bottom-0 left-0 right-0 p-4 flex justify-between items-end text-white z-10">
+      {/* Overlaid UI Elements - Adjusted bottom position to avoid overlap with BottomNavBar */}
+      <div className="absolute left-0 right-0 p-4 flex justify-between items-end text-white z-10 bottom-16">
         {/* User Info and Caption (Bottom Left) */}
         <div className="flex-1 pr-16"> {/* Add right padding to prevent overlap with buttons */}
           <div className="flex items-center mb-2">

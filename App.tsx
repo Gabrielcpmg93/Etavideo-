@@ -1,9 +1,11 @@
+
 import React from 'react';
 import { HashRouter as Router, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
-import { Post } from './types';
+import { Post, UserProfile } from './types'; // Import UserProfile
 import VideoFeed from './components/VideoFeed';
 import PostCreator from './components/PostCreator';
-import Modal from './components/Modal'; // Import the Modal component
+import Modal from './components/Modal';
+import ProfilePage from './components/ProfilePage'; // Import ProfilePage
 
 // Declare window.aistudio globally for TypeScript using interface augmentation
 interface Window {
@@ -45,21 +47,24 @@ const BottomNavBar: React.FC = () => {
           <span className="sr-only">Criar Post</span>
         </Link>
 
-        {/* Placeholder for Profile/Inbox for full TikTok parity - keeping it simple for now */}
-        <button
-          className="flex flex-col items-center justify-center p-2 rounded-lg text-gray-400 hover:text-white transition-colors duration-200 cursor-not-allowed opacity-50"
-          disabled
-          aria-label="Profile (coming soon)"
+        {/* Updated Profile Link */}
+        <Link
+          to="/profile"
+          className={`flex flex-col items-center justify-center p-2 rounded-lg transition-colors duration-200 ${
+            location.pathname === '/profile' ? 'text-blue-500' : 'text-gray-400 hover:text-white'
+          }`}
+          aria-label="Profile"
         >
           <svg className="w-7 h-7" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"></path>
           </svg>
           <span className="text-xs mt-1">Perfil</span>
-        </button>
+        </Link>
       </div>
     </nav>
   );
 };
+
 
 const App: React.FC = () => {
   const [posts, setPosts] = React.useState<Post[]>(() => {
@@ -72,6 +77,29 @@ const App: React.FC = () => {
     }
   });
 
+  const [userProfile, setUserProfile] = React.useState<UserProfile>(() => {
+    try {
+      const storedProfile = localStorage.getItem('socialvid_user_profile');
+      return storedProfile ? JSON.parse(storedProfile) : {
+        id: crypto.randomUUID(),
+        name: 'Usuário Gemini',
+        bio: 'Olá! Sou um entusiasta de vídeos e adoro compartilhar momentos.',
+        avatarUrl: 'https://i.pravatar.cc/150?img=68', // Default avatar
+        followers: 0,
+      };
+    } catch (error) {
+      console.error("Failed to parse user profile from localStorage:", error);
+      return {
+        id: crypto.randomUUID(),
+        name: 'Usuário Gemini',
+        bio: 'Olá! Sou um entusiasta de vídeos e adoro compartilhar momentos.',
+        avatarUrl: 'https://i.pravatar.cc/150?img=68', // Default avatar
+        followers: 0,
+      };
+    }
+  });
+
+
   // State for API Key Modal
   const [showApiKeyModal, setShowApiKeyModal] = React.useState(false);
   const [apiKeyErrorPrompt, setApiKeyErrorPrompt] = React.useState('');
@@ -80,6 +108,10 @@ const App: React.FC = () => {
     localStorage.setItem('socialvid_posts', JSON.stringify(posts));
   }, [posts]);
 
+  React.useEffect(() => {
+    localStorage.setItem('socialvid_user_profile', JSON.stringify(userProfile));
+  }, [userProfile]);
+
   const handlePost = (newPostData: Omit<Post, 'id' | 'timestamp' | 'likes' | 'comments' | 'userName' | 'userAvatar'>) => {
     const newPost: Post = {
       ...newPostData,
@@ -87,8 +119,8 @@ const App: React.FC = () => {
       timestamp: Date.now(),
       likes: Math.floor(Math.random() * 100),
       comments: [],
-      userName: 'Usuário Gemini',
-      userAvatar: `https://picsum.photos/40/40?random=${crypto.randomUUID()}`,
+      userName: userProfile.name, // Use current user's name
+      userAvatar: userProfile.avatarUrl, // Use current user's avatar
     };
     setPosts((prevPosts) => [...prevPosts, newPost]);
     window.location.hash = '#/'; // Navigate back to feed after posting
@@ -105,6 +137,13 @@ const App: React.FC = () => {
     window.aistudio.openSelectKey();
   };
 
+  const updateUserProfile = (updatedProfile: Partial<UserProfile>) => {
+    setUserProfile((prevProfile) => {
+      const newProfile = { ...prevProfile, ...updatedProfile };
+      localStorage.setItem('socialvid_user_profile', JSON.stringify(newProfile));
+      return newProfile;
+    });
+  };
 
   return (
     <Router>
@@ -120,6 +159,15 @@ const App: React.FC = () => {
                   onPost={handlePost}
                   onCancel={() => window.location.hash = '#/'}
                   onApiKeyError={handleApiKeySelectionNeeded} // Pass the handler
+                />
+              }
+            />
+            <Route
+              path="/profile"
+              element={
+                <ProfilePage
+                  userProfile={userProfile}
+                  updateUserProfile={updateUserProfile}
                 />
               }
             />
