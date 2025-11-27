@@ -1,3 +1,5 @@
+
+
 import React from 'react';
 import { Post } from '../types';
 import VideoCard from './VideoCard';
@@ -6,9 +8,12 @@ import Spinner from './Spinner';
 interface VideoFeedProps {
   posts: Post[];
   isLoading?: boolean;
+  feedMode: 'standard' | 'advanced'; // New prop
+  onGenerateAiSummary: (postId: string, base64Thumbnail: string) => Promise<string | null>; // New prop
+  onApiKeyError: () => void; // Prop to handle API key errors from summary generation
 }
 
-const VideoFeed: React.FC<VideoFeedProps> = ({ posts, isLoading }) => {
+const VideoFeed: React.FC<VideoFeedProps> = ({ posts, isLoading, feedMode, onGenerateAiSummary, onApiKeyError }) => {
   const [activeVideoIndex, setActiveVideoIndex] = React.useState(0);
   const feedRef = React.useRef<HTMLDivElement>(null);
 
@@ -40,8 +45,14 @@ const VideoFeed: React.FC<VideoFeedProps> = ({ posts, isLoading }) => {
     // This ensures the feed starts with the newest post if it's sorted to the top.
     const handlePostsChange = () => {
       if (currentFeedRef && posts.length > 0) {
-        currentFeedRef.scrollTo({ top: 0, behavior: 'instant' }); // Go to top for new posts
-        setActiveVideoIndex(0); // Set first video as active
+        // Only scroll to top if a new post is likely added at the top (sorted by timestamp)
+        // If posts.length changed and the current active video is no longer the top one, scroll.
+        if (activeVideoIndex !== 0) { // Or a more sophisticated check for new posts
+          currentFeedRef.scrollTo({ top: 0, behavior: 'instant' }); // Go to top for new posts
+          setActiveVideoIndex(0); // Set first video as active
+        }
+      } else if (posts.length === 0) { // If feed becomes empty, reset active index
+        setActiveVideoIndex(0);
       }
     };
     handlePostsChange(); // Run once on mount and when posts update
@@ -87,6 +98,8 @@ const VideoFeed: React.FC<VideoFeedProps> = ({ posts, isLoading }) => {
           key={post.id}
           post={post}
           isActive={index === activeVideoIndex}
+          showAiSummary={feedMode === 'advanced'} // Pass prop for advanced feed
+          onGenerateAiSummary={onGenerateAiSummary} // Pass the summary generation function
         />
       ))}
     </div>

@@ -1,39 +1,61 @@
 
 import React from 'react';
 import { HashRouter as Router, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
-import { Post, UserProfile } from './types'; // Import UserProfile
+import { Post, UserProfile, GeminiApiKeyError } from './types'; // Import UserProfile, GeminiApiKeyError
 import VideoFeed from './components/VideoFeed';
 import PostCreator from './components/PostCreator';
 import Modal from './components/Modal';
 import ProfilePage from './components/ProfilePage'; // Import ProfilePage
+import { generateVideoSummary } from './services/geminiService'; // Import new service function
 
 // Declare window.aistudio globally for TypeScript using interface augmentation
-interface Window {
-  aistudio: {
-    hasSelectedApiKey: () => Promise<boolean>;
-    openSelectKey: () => Promise<void>;
-  };
+// Fix: Use the globally expected 'AIStudio' interface to prevent type conflicts.
+// This assumes 'AIStudio' is defined elsewhere in the project's global type declarations.
+declare global {
+  interface Window {
+    aistudio: AIStudio;
+  }
 }
 
-// Bottom Navigation Bar Component
-const BottomNavBar: React.FC = () => {
+// Bottom Navigation Bar Component (moved here for direct access to toggleFeedMode)
+interface BottomNavBarProps {
+  currentFeedMode: 'standard' | 'advanced';
+  onToggleFeedMode: () => void;
+}
+
+const BottomNavBar: React.FC<BottomNavBarProps> = ({ currentFeedMode, onToggleFeedMode }) => {
   const location = useLocation();
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-gray-900 text-white shadow-lg p-3 z-50">
-      <div className="flex justify-around items-center h-16 max-w-md mx-auto">
+      <div className="flex justify-around items-center h-16 max-w-lg mx-auto">
         <Link
           to="/"
           className={`flex flex-col items-center justify-center p-2 rounded-lg transition-colors duration-200 ${
-            location.pathname === '/' ? 'text-blue-500' : 'text-gray-400 hover:text-white'
+            location.pathname === '/' && currentFeedMode === 'standard' ? 'text-blue-500' : 'text-gray-400 hover:text-white'
           }`}
-          aria-label="Feed"
+          aria-label="Feed Padrão"
         >
           <svg className="w-7 h-7" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"></path>
           </svg>
           <span className="text-xs mt-1">Feed</span>
         </Link>
+
+        {/* New Advanced Feed Button */}
+        <button
+          onClick={onToggleFeedMode}
+          className={`flex flex-col items-center justify-center p-2 rounded-lg transition-colors duration-200 ${
+            location.pathname === '/' && currentFeedMode === 'advanced' ? 'text-blue-500' : 'text-gray-400 hover:text-white'
+          }`}
+          aria-label="Feed Avançado"
+        >
+          {/* Sparkle Icon */}
+          <svg className="w-7 h-7" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"></path>
+          </svg>
+          <span className="text-xs mt-1">Avançado</span>
+        </button>
 
         <Link
           to="/post"
@@ -99,6 +121,7 @@ const App: React.FC = () => {
     }
   });
 
+  const [feedMode, setFeedMode] = React.useState<'standard' | 'advanced'>('standard'); // New state for feed mode
 
   // State for API Key Modal
   const [showApiKeyModal, setShowApiKeyModal] = React.useState(false);
@@ -112,7 +135,7 @@ const App: React.FC = () => {
     localStorage.setItem('socialvid_user_profile', JSON.stringify(userProfile));
   }, [userProfile]);
 
-  const handlePost = (newPostData: Omit<Post, 'id' | 'timestamp' | 'likes' | 'comments' | 'userName' | 'userAvatar'>) => {
+  const handlePost = (newPostData: Omit<Post, 'id' | 'timestamp' | 'likes' | 'comments' | 'userName' | 'userAvatar' | 'aiSummary'>) => {
     const newPost: Post = {
       ...newPostData,
       id: crypto.randomUUID(),
@@ -126,9 +149,10 @@ const App: React.FC = () => {
     window.location.hash = '#/'; // Navigate back to feed after posting
   };
 
-  const handleApiKeySelectionNeeded = () => {
+  const handleApiKeySelectionNeeded = (message?: string) => {
     setApiKeyErrorPrompt(
-      'A API key é necessária para este recurso avançado (geração de legenda com IA). Por favor, selecione uma chave API paga no painel para continuar. ' +
+      message ||
+      'A API key é necessária para este recurso avançado (geração de legenda/resumo com IA). Por favor, selecione uma chave API paga no painel para continuar. ' +
       'Você pode encontrar mais informações sobre faturamento em ai.google.dev/gemini-api/docs/billing.'
     );
     setShowApiKeyModal(true);
@@ -136,6 +160,30 @@ const App: React.FC = () => {
     // The actual API call will be retried by PostCreator after the user selects a key.
     window.aistudio.openSelectKey();
   };
+
+  const handleToggleFeedMode = () => {
+    setFeedMode((prevMode) => (prevMode === 'standard' ? 'advanced' : 'standard'));
+  };
+
+  const handleGenerateAiSummary = React.useCallback(async (postId: string, base64Thumbnail: string): Promise<string | null> => {
+    try {
+      const summary = await generateVideoSummary(base64Thumbnail, `Gere um resumo curto e objetivo (máx. 50 palavras) do conteúdo deste vídeo. Dê uma ideia geral do que se trata.`);
+      if (summary) {
+        setPosts((prevPosts) =>
+          prevPosts.map((post) => (post.id === postId ? { ...post, aiSummary: summary } : post))
+        );
+      }
+      return summary;
+    } catch (error) {
+      if (error instanceof GeminiApiKeyError) {
+        handleApiKeySelectionNeeded(error.message);
+      } else {
+        console.error("Failed to generate AI summary:", error);
+      }
+      return null;
+    }
+  }, [handleApiKeySelectionNeeded]);
+
 
   const updateUserProfile = (updatedProfile: Partial<UserProfile>) => {
     setUserProfile((prevProfile) => {
@@ -151,7 +199,14 @@ const App: React.FC = () => {
         {/* Main Content Area - takes up full available height */}
         <main className="flex-grow flex flex-col">
           <Routes>
-            <Route path="/" element={<VideoFeed posts={posts} />} />
+            <Route path="/" element={
+              <VideoFeed
+                posts={posts}
+                feedMode={feedMode}
+                onGenerateAiSummary={handleGenerateAiSummary}
+                onApiKeyError={handleApiKeySelectionNeeded}
+              />
+            } />
             <Route
               path="/post"
               element={
@@ -177,7 +232,7 @@ const App: React.FC = () => {
         </main>
 
         {/* Bottom Navigation Bar */}
-        <BottomNavBar />
+        <BottomNavBar currentFeedMode={feedMode} onToggleFeedMode={handleToggleFeedMode} />
 
         {/* API Key Selection Modal */}
         <Modal
@@ -187,7 +242,7 @@ const App: React.FC = () => {
         >
           <p className="text-gray-700 mb-4">{apiKeyErrorPrompt}</p>
           <p className="text-sm text-gray-500">
-            Você deve ter uma chave API válida associada a um projeto Google Cloud faturável para usar recursos avançados da IA Gemini, como a geração automática de legendas com o modelo `gemini-3-pro-image-preview`.
+            Você deve ter uma chave API válida associada a um projeto Google Cloud faturável para usar recursos avançados da IA Gemini, como a geração automática de legendas com o modelo `gemini-3-pro-image-preview` ou resumos com `gemini-2.5-flash`.
           </p>
           <div className="mt-6 flex justify-end">
             <button

@@ -1,3 +1,5 @@
+
+
 import React from 'react';
 import Button from './Button';
 import { generateVideoTitle, generateVideoCaption } from '../services/geminiService';
@@ -5,7 +7,7 @@ import { Post, GeminiApiKeyError } from '../types'; // Import GeminiApiKeyError
 import Spinner from './Spinner';
 
 interface PostCreatorProps {
-  onPost: (post: Omit<Post, 'id' | 'timestamp' | 'likes' | 'comments' | 'userName' | 'userAvatar'>) => void;
+  onPost: (post: Omit<Post, 'id' | 'timestamp' | 'likes' | 'comments' | 'userName' | 'userAvatar' | 'aiSummary'>) => void;
   onCancel: () => void;
   onApiKeyError: () => void; // New prop to handle API key errors
 }
