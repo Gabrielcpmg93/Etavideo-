@@ -10,6 +10,7 @@ interface VideoCardProps {
 const VideoCard: React.FC<VideoCardProps> = ({ post, isActive }) => {
   const [isPlaying, setIsPlaying] = React.useState(false);
   const [showPlayIcon, setShowPlayIcon] = React.useState(true); // Control visibility of play/pause overlay
+  const [isMuted, setIsMuted] = React.useState(true); // Control mute state, default to muted
   const [isLiked, setIsLiked] = React.useState(false); // Client-side like state
   const [likeCount, setLikeCount] = React.useState(post.likes);
   const videoRef = React.useRef<HTMLVideoElement>(null);
@@ -17,15 +18,16 @@ const VideoCard: React.FC<VideoCardProps> = ({ post, isActive }) => {
   React.useEffect(() => {
     if (videoRef.current) {
       if (isActive) {
-        videoRef.current.muted = true; // Auto-play silently
+        videoRef.current.muted = isMuted; // Use local mute state
         videoRef.current.play().then(() => {
           setIsPlaying(true);
-          setShowPlayIcon(false); // Hide play icon when auto-playing
+          setShowPlayIcon(false); // Hide play icon when playing
         }).catch(error => {
-          console.error("Error attempting to auto-play video:", error);
-          // User interaction might be required, show play icon
+          // Playback failed, likely due to browser autoplay policies with sound
+          console.error("Error attempting to play video:", error);
           setIsPlaying(false);
-          setShowPlayIcon(true);
+          setShowPlayIcon(true); // Show play icon to prompt user interaction
+          videoRef.current!.pause(); // Ensure it's paused
         });
       } else {
         videoRef.current.pause();
@@ -33,23 +35,28 @@ const VideoCard: React.FC<VideoCardProps> = ({ post, isActive }) => {
         setShowPlayIcon(true); // Show play icon when paused/inactive
       }
     }
-  }, [isActive]);
+  }, [isActive, isMuted]); // Added isMuted to dependencies
 
   const togglePlay = () => {
     if (videoRef.current) {
       if (isPlaying) {
         videoRef.current.pause();
-        setShowPlayIcon(true);
       } else {
+        // If unmuted and attempting to play, it might be blocked.
+        // The useEffect handles the actual play/pause logic based on isActive.
         videoRef.current.play().catch(error => console.error("Error playing video:", error));
-        setShowPlayIcon(false);
       }
       setIsPlaying(!isPlaying);
+      setShowPlayIcon(!isPlaying); // Show icon if becoming paused, hide if becoming playing
     }
   };
 
-  const handleVideoClick = () => {
-    togglePlay();
+  const toggleMute = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent video play/pause
+    if (videoRef.current) {
+      videoRef.current.muted = !videoRef.current.muted;
+      setIsMuted(videoRef.current.muted);
+    }
   };
 
   const handleLikeClick = (e: React.MouseEvent) => {
@@ -64,18 +71,6 @@ const VideoCard: React.FC<VideoCardProps> = ({ post, isActive }) => {
     });
   };
 
-  // Temporarily show/hide play icon on tap feedback
-  const handleTapFeedback = () => {
-    if (!isPlaying) {
-      setShowPlayIcon(true);
-      setTimeout(() => setShowPlayIcon(false), 500); // Hide after a short delay
-    } else {
-      setShowPlayIcon(true); // Show pause icon briefly
-      setTimeout(() => setShowPlayIcon(false), 500);
-    }
-  };
-
-
   if (!post.videoUrl) {
     return (
       <div className="flex items-center justify-center bg-gray-900 text-white min-h-screen">
@@ -87,7 +82,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ post, isActive }) => {
   return (
     <div
       className="relative flex-shrink-0 w-full h-full bg-black snap-center"
-      onClick={handleVideoClick}
+      onClick={togglePlay} // Only toggle play/pause on main video click
       aria-label={`Video post by ${post.userName} with caption: ${post.caption}`}
       role="region"
       aria-live="polite"
@@ -102,12 +97,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ post, isActive }) => {
         className="w-full h-full object-cover"
         onPlay={() => { setIsPlaying(true); setShowPlayIcon(false); }}
         onPause={() => { setIsPlaying(false); setShowPlayIcon(true); }}
-        onEnded={() => {
-          // Restart video on ended for continuous loop experience
-          if (videoRef.current) {
-            videoRef.current.play();
-          }
-        }}
+        // Removed onEnded as 'loop' attribute handles continuous playback
       >
         Your browser does not support the video tag.
       </video>
@@ -168,6 +158,22 @@ const VideoCard: React.FC<VideoCardProps> = ({ post, isActive }) => {
               <path d="M21 15.04V6.29c0-.45-.3-.85-.75-1.03l-10-4.01c-.56-.22-1.19.04-1.42.6L8 3.5v9l-5.65 2.26c-.39.16-.65.57-.65 1V19c0 .55.45 1 1 1h14c.55 0 1-.45 1-1v-4.96c0-.45-.3-.85-.75-1.03l-1-4.01c-.22-.56-.85-.82-1.42-.6L13 13.5v-9l-1.35-.54c-.39-.16-.65-.57-.65-1V19c0 .55.45 1 1 1h14c.55 0 1-.45 1-1v-4.96zM12 18H5V6.7L12 3.85V18zm0-10.29V17l7-2.85V6.7L12 3.85V7.71z"></path>
             </svg>
             <span className="text-xs font-semibold mt-1" aria-hidden="true">{post.comments.length}</span>
+          </button>
+          <button
+            onClick={toggleMute}
+            className="flex flex-col items-center text-white"
+            aria-label={isMuted ? "Unmute video" : "Mute video"}
+          >
+            {isMuted ? (
+              <svg className="w-9 h-9" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.52 1.52C20.63 14.91 21 13.5 21 12c0-4.28-3.05-7.8-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5V9l-1.73-1.73L4.27 3zM10 15.17l-2.61-2.62L10 9.17v6zm-.12 3.39l-1.92-1.92L12 12l6.01 6.01 1.41 1.41-16.17-16.17z"></path>
+              </svg>
+            ) : (
+              <svg className="w-9 h-9" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.95 7-4.47 7-8.77s-2.99-7.82-7-8.77z"></path>
+              </svg>
+            )}
+            <span className="text-xs font-semibold mt-1" aria-hidden="true">{isMuted ? 'Mudo' : 'Som'}</span>
           </button>
           <button
             className="flex flex-col items-center text-white"

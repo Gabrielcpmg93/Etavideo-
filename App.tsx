@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { HashRouter as Router, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
 import { Post } from './types';
@@ -6,8 +5,7 @@ import VideoFeed from './components/VideoFeed';
 import PostCreator from './components/PostCreator';
 import Modal from './components/Modal'; // Import the Modal component
 
-// Declare window.aistudio globally for TypeScript
-// Fix: Use interface augmentation to extend the existing Window interface
+// Declare window.aistudio globally for TypeScript using interface augmentation
 interface Window {
   aistudio: {
     hasSelectedApiKey: () => Promise<boolean>;

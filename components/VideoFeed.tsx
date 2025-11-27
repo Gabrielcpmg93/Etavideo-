@@ -17,9 +17,14 @@ const VideoFeed: React.FC<VideoFeedProps> = ({ posts, isLoading }) => {
       if (feedRef.current) {
         const { scrollTop, clientHeight } = feedRef.current;
         // Calculate the index of the video that is most in view
-        const newActiveIndex = Math.round(scrollTop / clientHeight);
-        if (newActiveIndex !== activeVideoIndex) {
-          setActiveVideoIndex(newActiveIndex);
+        // Adding a small offset (+0.5) ensures that when exactly halfway, it rounds up to the next video.
+        const newActiveIndex = Math.round((scrollTop + clientHeight / 2) / clientHeight);
+        
+        // Ensure newActiveIndex is within the bounds of available posts
+        const clampedIndex = Math.max(0, Math.min(newActiveIndex, posts.length - 1));
+
+        if (clampedIndex !== activeVideoIndex) {
+          setActiveVideoIndex(clampedIndex);
         }
       }
     };
@@ -27,16 +32,26 @@ const VideoFeed: React.FC<VideoFeedProps> = ({ posts, isLoading }) => {
     const currentFeedRef = feedRef.current;
     if (currentFeedRef) {
       currentFeedRef.addEventListener('scroll', handleScroll, { passive: true });
-      // Initial check for active video
+      // Initial check for active video on mount
       handleScroll();
     }
+
+    // Recalculate active video if posts change (e.g., new post added)
+    // This ensures the feed starts with the newest post if it's sorted to the top.
+    const handlePostsChange = () => {
+      if (currentFeedRef && posts.length > 0) {
+        currentFeedRef.scrollTo({ top: 0, behavior: 'instant' }); // Go to top for new posts
+        setActiveVideoIndex(0); // Set first video as active
+      }
+    };
+    handlePostsChange(); // Run once on mount and when posts update
 
     return () => {
       if (currentFeedRef) {
         currentFeedRef.removeEventListener('scroll', handleScroll);
       }
     };
-  }, [activeVideoIndex, posts.length]);
+  }, [activeVideoIndex, posts.length]); // Depend on posts.length to re-run for new posts
 
   if (isLoading) {
     return (
@@ -62,7 +77,8 @@ const VideoFeed: React.FC<VideoFeedProps> = ({ posts, isLoading }) => {
   return (
     <div
       ref={feedRef}
-      className="w-screen h-[calc(100vh-theme(spacing.16)*2)] md:h-[calc(100vh-theme(spacing.16)*2)] lg:h-[calc(100vh-theme(spacing.16)*2)] overflow-y-scroll snap-y snap-mandatory bg-black"
+      // Corrected height: 100vh minus the bottom nav bar (h-16)
+      className="w-screen h-[calc(100vh-theme(spacing.16))] overflow-y-scroll snap-y snap-mandatory bg-black"
       aria-label="Video Feed"
       role="feed"
     >
