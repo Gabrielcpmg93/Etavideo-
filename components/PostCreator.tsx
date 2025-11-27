@@ -1,5 +1,4 @@
 
-
 import React from 'react';
 import Button from './Button';
 import { generateVideoTitle, generateVideoCaption } from '../services/geminiService';
@@ -7,9 +6,9 @@ import { Post, GeminiApiKeyError } from '../types'; // Import GeminiApiKeyError
 import Spinner from './Spinner';
 
 interface PostCreatorProps {
-  onPost: (post: Omit<Post, 'id' | 'timestamp' | 'likes' | 'comments' | 'userName' | 'userAvatar' | 'aiSummary'>) => void;
+  onPost: (post: Omit<Post, 'id' | 'timestamp' | 'likes' | 'comments' | 'userName' | 'userAvatar'>) => void;
   onCancel: () => void;
-  onApiKeyError: () => void; // New prop to handle API key errors
+  onApiKeyError: (message?: string) => void; // New prop to handle API key errors, now with optional message
 }
 
 const PostCreator: React.FC<PostCreatorProps> = ({ onPost, onCancel, onApiKeyError }) => {
@@ -19,7 +18,7 @@ const PostCreator: React.FC<PostCreatorProps> = ({ onPost, onCancel, onApiKeyErr
   const [caption, setCaption] = React.useState<string>('');
   const [loadingSuggestions, setLoadingSuggestions] = React.useState(false);
   const [generatingThumbnail, setGeneratingThumbnail] = React.useState(false);
-  const [hasApiKeyError, setHasApiKeyError] = React.useState(false); // New state for API key error
+  const [hasApiKeyError, setHasApiKeyError] = React.useState(false); // State for API key error
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -99,9 +98,6 @@ const PostCreator: React.FC<PostCreatorProps> = ({ onPost, onCancel, onApiKeyErr
     if (hasApiKeyError) {
       onApiKeyError();
       setHasApiKeyError(false); // Reset error state after triggering selection
-      // Do not proceed with generation immediately, rely on user to click again after selection.
-      // The guideline states: "assume the key selection was successful after triggering openSelectKey() and proceed to the app."
-      // This allows the user to click the button again after making their selection.
       return;
     }
 
@@ -133,8 +129,7 @@ const PostCreator: React.FC<PostCreatorProps> = ({ onPost, onCancel, onApiKeyErr
     } catch (error) {
       if (error instanceof GeminiApiKeyError) {
         setHasApiKeyError(true);
-        onApiKeyError(); // Trigger API key selection flow
-        alert(error.message); // Inform user about the error
+        onApiKeyError(error.message); // Trigger API key selection flow with error message
       } else {
         console.error("Failed to generate suggestions:", error);
         alert('Erro ao gerar sugestões. Tente novamente.');
@@ -179,7 +174,7 @@ const PostCreator: React.FC<PostCreatorProps> = ({ onPost, onCancel, onApiKeyErr
   };
 
   const getButtonText = () => {
-    if (loadingSuggestions) return 'Gerando...';
+    if (loadingSuggestions) return 'Gerando sugestões...';
     if (hasApiKeyError) return 'Selecionar API Key e Tentar Novamente';
     return 'Gerar Legenda com IA Gemini';
   };

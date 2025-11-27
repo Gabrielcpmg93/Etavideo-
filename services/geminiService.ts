@@ -47,7 +47,7 @@ export const generateVideoTitle = async (base64ThumbnailData: string, prompt: st
   } catch (error: any) {
     console.error("Error generating video title:", error);
     if (error.message?.includes("Requested entity was not found.") || error.message?.includes("API key not valid")) {
-      throw new GeminiApiKeyError("É necessário selecionar uma API Key paga para usar este recurso avançado (gemini-3-pro-image-preview).");
+      throw new GeminiApiKeyError("É necessário selecionar uma API Key paga para usar este recurso (geração de título com IA).");
     }
     throw error; // Re-throw other errors
   }
@@ -90,48 +90,7 @@ export const generateVideoCaption = async (base64ThumbnailData: string, prompt: 
   } catch (error: any) {
     console.error("Error generating video caption:", error);
     if (error.message?.includes("Requested entity was not found.") || error.message?.includes("API key not valid")) {
-      throw new GeminiApiKeyError("É necessário selecionar uma API Key paga para usar este recurso avançado (gemini-3-pro-image-preview).");
-    }
-    throw error; // Re-throw other errors
-  }
-};
-
-/**
- * Generates a concise summary for a video based on its thumbnail using the Gemini API.
- * @param base64ThumbnailData The base64 encoded data string (without "data:image/jpeg;base64,") of the video thumbnail.
- * @param prompt The prompt to use for generating the summary.
- * @returns A suggested summary string or null if an error occurs.
- * @throws {GeminiApiKeyError} if an API key-related error occurs.
- */
-export const generateVideoSummary = async (base64ThumbnailData: string, prompt: string): Promise<string | null> => {
-  try {
-    const ai = await createGeminiClient();
-    const imagePart = {
-      inlineData: {
-        mimeType: 'image/jpeg',
-        data: base64ThumbnailData,
-      },
-    };
-    const textPart = { text: prompt };
-
-    const response: GenerateContentResponse = await ai.models.generateContent({
-      model: 'gemini-2.5-flash', // Using gemini-2.5-flash for faster, cost-effective text summary
-      contents: { parts: [imagePart, textPart] },
-      config: {
-        maxOutputTokens: 80,
-        temperature: 0.6,
-      },
-    });
-
-    const summary = response.text?.trim();
-    if (summary) {
-      return summary;
-    }
-    return null;
-  } catch (error: any) {
-    console.error("Error generating video summary:", error);
-    if (error.message?.includes("Requested entity was not found.") || error.message?.includes("API key not valid")) {
-      throw new GeminiApiKeyError("É necessário selecionar uma API Key paga para usar este recurso avançado (gemini-2.5-flash).");
+      throw new GeminiApiKeyError("É necessário selecionar uma API Key paga para usar este recurso (geração de legenda com IA).");
     }
     throw error; // Re-throw other errors
   }

@@ -1,5 +1,4 @@
 
-
 import React from 'react';
 import { UserProfile } from '../types';
 import Button from './Button';

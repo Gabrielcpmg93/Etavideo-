@@ -6,19 +6,16 @@ import Spinner from './Spinner';
 interface VideoCardProps {
   post: Post;
   isActive: boolean; // New prop to indicate if this video is currently in the viewport
-  showAiSummary?: boolean; // New prop for advanced feed
-  onGenerateAiSummary?: (postId: string, base64Thumbnail: string) => Promise<string | null>; // New prop for advanced feed
 }
 
-const VideoCard: React.FC<VideoCardProps> = ({ post, isActive, showAiSummary = false, onGenerateAiSummary }) => {
+const VideoCard: React.FC<VideoCardProps> = ({ post, isActive }) => {
   const [isPlaying, setIsPlaying] = React.useState(false);
   const [showPlayIcon, setShowPlayIcon] = React.useState(true); // Control visibility of play/pause overlay
   const [isMuted, setIsMuted] = React.useState(true); // Control mute state, default to muted
   const [isLiked, setIsLiked] = React.useState(false); // Client-side like state
   const [likeCount, setLikeCount] = React.useState(post.likes);
-  const [isLoadingVideo, setIsLoadingVideo] = React.useState(true); // New: for video buffering indicator
-  const [loadingAiSummary, setLoadingAiSummary] = React.useState(false); // New: for AI summary generation
-  const [hasUserManuallyToggledPlay, setHasUserManuallyToggledPlay] = React.useState(false); // New: to track user's explicit play/pause
+  const [isLoadingVideo, setIsLoadingVideo] = React.useState(true); // For video buffering indicator
+  const [hasUserManuallyToggledPlay, setHasUserManuallyToggledPlay] = React.useState(false); // To track user's explicit play/pause
 
   const videoRef = React.useRef<HTMLVideoElement>(null);
 
@@ -28,16 +25,26 @@ const VideoCard: React.FC<VideoCardProps> = ({ post, isActive, showAiSummary = f
 
       if (isActive) {
         if (!hasUserManuallyToggledPlay) { // Only auto-play if user hasn't explicitly toggled
-          setIsLoadingVideo(true); // Assume loading when activated
+          setIsLoadingVideo(true); // Assume loading when activated for auto-play
           videoRef.current.play().then(() => {
             // isPlaying and showPlayIcon will be set by onPlay handler
-            setIsLoadingVideo(false);
+            // isLoadingVideo will be set to false by onPlay/onPlaying handler
           }).catch(error => {
-            console.error("Error attempting to auto-play video:", error);
-            videoRef.current!.pause(); // Ensure it's paused if auto-play fails
-            setIsPlaying(false);
-            setShowPlayIcon(true);
-            setIsLoadingVideo(false); // Stop loading if play fails
+            if (error.name === "NotAllowedError") {
+              // Browser policy prevented autoplay (e.g., sound present without user interaction)
+              console.log("Autoplay blocked, user interaction needed for sound.");
+              // Keep video paused, show play icon, reset loading
+              videoRef.current!.pause();
+              setIsPlaying(false);
+              setShowPlayIcon(true);
+              setIsLoadingVideo(false);
+            } else {
+              console.error("Error attempting to auto-play video:", error);
+              videoRef.current!.pause(); // Ensure it's paused if auto-play fails
+              setIsPlaying(false);
+              setShowPlayIcon(true);
+              setIsLoadingVideo(false); // Stop loading if play fails
+            }
           });
         }
       } else {
@@ -49,21 +56,6 @@ const VideoCard: React.FC<VideoCardProps> = ({ post, isActive, showAiSummary = f
     }
   }, [isActive, isMuted, hasUserManuallyToggledPlay]);
 
-  // New: Effect to generate AI summary if needed for advanced feed
-  React.useEffect(() => {
-    // Only attempt to generate if conditions are met
-    if (showAiSummary && !post.aiSummary && !loadingAiSummary && onGenerateAiSummary && post.thumbnailUrl) {
-      setLoadingAiSummary(true);
-      const base64ThumbnailData = post.thumbnailUrl.split(',')[1];
-      const summaryPrompt = `Gere um resumo curto e objetivo (máx. 50 palavras) do conteúdo deste vídeo. Dê uma ideia geral do que se trata.`;
-
-      onGenerateAiSummary(post.id, base64ThumbnailData)
-        .finally(() => {
-          setLoadingAiSummary(false);
-        });
-    }
-  }, [showAiSummary, post.aiSummary, loadingAiSummary, onGenerateAiSummary, post.id, post.thumbnailUrl]);
-
 
   const togglePlay = () => {
     if (videoRef.current) {
@@ -72,11 +64,12 @@ const VideoCard: React.FC<VideoCardProps> = ({ post, isActive, showAiSummary = f
       if (isPlaying) {
         videoRef.current.pause();
         // isPlaying and showPlayIcon will be set by onPause handler
+        setIsLoadingVideo(false); // No longer loading when paused
       } else {
         setIsLoadingVideo(true); // Indicate loading when user clicks play
         videoRef.current.play().then(() => {
           // isPlaying and showPlayIcon will be set by onPlay handler
-          setIsLoadingVideo(false);
+          // isLoadingVideo will be set to false by onPlay/onPlaying handler
         }).catch(error => {
           console.error("Manual play failed:", error);
           setIsPlaying(false);
@@ -132,10 +125,10 @@ const VideoCard: React.FC<VideoCardProps> = ({ post, isActive, showAiSummary = f
         preload="auto"
         className="w-full h-full object-cover"
         onPlay={() => { setIsPlaying(true); setShowPlayIcon(false); setIsLoadingVideo(false); }}
-        onPause={() => { setIsPlaying(false); setShowPlayIcon(true); }}
-        onWaiting={() => setIsLoadingVideo(true)} // Video is buffering
-        onPlaying={() => setIsLoadingVideo(false)} // Video has enough data to play
-        onLoadedData={() => setIsLoadingVideo(false)} // First frame loaded or metadata loaded
+        onPause={() => { setIsPlaying(false); setShowPlayIcon(true); setIsLoadingVideo(false); }}
+        onWaiting={() => { if (isActive) setIsLoadingVideo(true); }} // Video is buffering, only if active
+        onPlaying={() => { if (isActive) setIsLoadingVideo(false); }} // Video has enough data to play, only if active
+        // onLoadedData removed from updating isLoadingVideo directly to prevent flickering
         aria-describedby={`video-caption-${post.id}`}
       >
         Your browser does not support the video tag.
@@ -162,20 +155,6 @@ const VideoCard: React.FC<VideoCardProps> = ({ post, isActive, showAiSummary = f
           )}
         </div>
       )}
-
-      {/* AI Summary Overlay for Advanced Feed */}
-      {showAiSummary && (post.aiSummary || loadingAiSummary) && (
-        <div className="absolute top-4 left-4 bg-black bg-opacity-60 text-white text-xs px-3 py-1.5 rounded-lg max-w-[calc(100%-80px)] z-10 shadow-md">
-          <p className="font-semibold mb-1 flex items-center">
-            <svg className="w-4 h-4 mr-1 text-blue-300" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" fill="currentColor" />
-            </svg>
-            Resumo IA: {loadingAiSummary ? <Spinner size="sm" color="text-white" className="ml-2" /> : ''}
-          </p>
-          {!loadingAiSummary && post.aiSummary && <p>{post.aiSummary}</p>}
-        </div>
-      )}
-
 
       {/* Overlaid UI Elements - Adjusted bottom position to avoid overlap with BottomNavBar */}
       <div className="absolute left-0 right-0 p-4 flex justify-between items-end text-white z-10 bottom-16">

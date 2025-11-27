@@ -7,12 +7,9 @@ import Spinner from './Spinner';
 interface VideoFeedProps {
   posts: Post[];
   isLoading?: boolean;
-  feedMode: 'standard' | 'advanced'; // New prop
-  onGenerateAiSummary: (postId: string, base64Thumbnail: string) => Promise<string | null>; // New prop
-  onApiKeyError: () => void; // Prop to handle API key errors from summary generation
 }
 
-const VideoFeed: React.FC<VideoFeedProps> = ({ posts, isLoading, feedMode, onGenerateAiSummary, onApiKeyError }) => {
+const VideoFeed: React.FC<VideoFeedProps> = ({ posts, isLoading }) => {
   const [activeVideoIndex, setActiveVideoIndex] = React.useState(0);
   const feedRef = React.useRef<HTMLDivElement>(null);
 
@@ -97,8 +94,6 @@ const VideoFeed: React.FC<VideoFeedProps> = ({ posts, isLoading, feedMode, onGen
           key={post.id}
           post={post}
           isActive={index === activeVideoIndex}
-          showAiSummary={feedMode === 'advanced'} // Pass prop for advanced feed
-          onGenerateAiSummary={onGenerateAiSummary} // Pass the summary generation function
         />
       ))}
     </div>

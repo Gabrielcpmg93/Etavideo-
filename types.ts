@@ -1,5 +1,4 @@
 
-
 export interface Post {
   id: string;
   videoUrl: string;
@@ -10,7 +9,6 @@ export interface Post {
   comments: Comment[];
   userName: string;
   userAvatar: string;
-  aiSummary?: string; // New: Optional AI-generated summary for advanced feed
 }
 
 export interface Comment {
