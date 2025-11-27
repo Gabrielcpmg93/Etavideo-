@@ -1,0 +1,9 @@
+{
+  "name": "SocialVid",
+  "description": "Uma plataforma de rede social avançada para compartilhar e descobrir vídeos, impulsionada por IA Gemini para criação e curadoria de conteúdo.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}
