@@ -1,6 +1,5 @@
-
 import React from 'react';
-import { HashRouter as Router, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Post, UserProfile, GeminiApiKeyError } from './types'; // Import UserProfile, GeminiApiKeyError
 import VideoFeed from './components/VideoFeed';
 import PostCreator from './components/PostCreator';
@@ -54,6 +53,8 @@ const App: React.FC = () => {
   const [showApiKeyModal, setShowApiKeyModal] = React.useState(false);
   const [apiKeyErrorPrompt, setApiKeyErrorPrompt] = React.useState('');
 
+  const navigate = useNavigate(); // Initialize useNavigate hook
+
   React.useEffect(() => {
     localStorage.setItem('socialvid_posts', JSON.stringify(posts));
   }, [posts]);
@@ -73,7 +74,7 @@ const App: React.FC = () => {
       userAvatar: userProfile.avatarUrl, // Use current user's avatar
     };
     setPosts((prevPosts) => [...prevPosts, newPost]);
-    window.location.hash = '#/'; // Navigate back to feed after posting
+    navigate('/'); // Navigate back to feed after posting using useNavigate
   };
 
   const handleApiKeySelectionNeeded = (message?: string) => {
@@ -112,7 +113,7 @@ const App: React.FC = () => {
               element={
                 <PostCreator
                   onPost={handlePost}
-                  onCancel={() => window.location.hash = '#/'}
+                  onCancel={() => navigate('/')} // Use navigate for cancel
                   onApiKeyError={handleApiKeySelectionNeeded} // Pass the handler
                 />
               }
